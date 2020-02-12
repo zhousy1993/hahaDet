@@ -1,11 +1,7 @@
 import torch
 from torch import nn
 import os
-from ..utils import concat_box_prediction_layers
-from atss_core.layers import SigmoidFocalLoss
-from atss_core.modeling.matcher import Matcher
-from atss_core.structures.boxlist_ops import boxlist_iou
-from atss_core.structures.boxlist_ops import cat_boxlist
+
 
 
 INF = 100000000
@@ -77,7 +73,7 @@ class ATSSLossComputation(object):
             return losses.sum()
 
     def DIoU(self, pred, target, anchor):
-
+        pass
 
     def GIoU(self, pred, target, anchor):
         pred_boxes = self.box_coder.decode(pred.view(-1, 4), anchor.view(-1, 4))
