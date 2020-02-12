@@ -154,9 +154,9 @@ def boxlist_giou(boxlist1, boxlist2):
     giou_wh = (giou_rb - giou_lt + TO_REMOVE).clamp(min=0)  # [N,M,2]
     enclose = giou_wh[:, :, 0] * giou_wh[:, :, 1]  #[N,M]
 
-
-    iou = inter / (area1[:, None] + area2 - inter)
-    punish = (enclose - area1[:, None] - area2 + inter)
+    intersect = area1[:, None] + area2 - inter
+    iou = inter / intersect
+    punish = (enclose - intersect) / enclose
 
     giou = iou - punish
     return giou
