@@ -154,12 +154,72 @@ def boxlist_giou(boxlist1, boxlist2):
     giou_wh = (giou_rb - giou_lt + TO_REMOVE).clamp(min=0)  # [N,M,2]
     enclose = giou_wh[:, :, 0] * giou_wh[:, :, 1]  #[N,M]
 
-    intersect = area1[:, None] + area2 - inter
-    iou = inter / intersect
-    punish = (enclose - intersect) / enclose
+    union = area1[:, None] + area2 - inter
+    iou = inter / union
+    punish = (enclose - union) / enclose
 
     giou = iou - punish
     return giou
+
+def boxlist_diou(boxlist1, boxlist2):
+    """Compute the intersection over union of two set of boxes.
+    The box order must be (xmin, ymin, xmax, ymax).
+
+    Arguments:
+      box1: (BoxList) bounding boxes, sized [N,4].
+      box2: (BoxList) bounding boxes, sized [M,4].
+
+    Returns:
+      (tensor) iou, sized [N,M].
+
+    Reference:
+      https://github.com/chainer/chainercv/blob/master/chainercv/utils/bbox/bbox_iou.py
+    """
+    if boxlist1.size != boxlist2.size:
+        raise RuntimeError(
+                "boxlists should have same image size, got {}, {}".format(boxlist1, boxlist2))
+
+    N = len(boxlist1)
+    M = len(boxlist2)
+
+    area1 = boxlist1.area()
+    area2 = boxlist2.area()
+
+    box1, box2 = boxlist1.bbox, boxlist2.bbox # [N,4] [M,4]
+
+    # cal the center of box1 and box2
+    box1_center_x = (box1[:, 0] + box1[:, 2]) / 2 # [N,1]
+    box1_center_y = (box1[:, 1] + box1[:, 3]) / 2 # [N,1]
+    box2_center_x = (box2[:, 0] + box2[:, 2]) / 2 # [M,1]
+    box2_center_y = (box2[:, 1] + box2[:, 3]) / 2 # [M,1]
+    box1_center = torch.cat((box1_center_x, box1_center_y), dim=1) # [N,2]
+    box2_center = torch.cat((box2_center_x, box2_center_y), dim=1) # [M,2]
+
+    #calculate the centerness distances
+    euclid_dis_sqr = (box1_center[:, None, :] - box2_center[:, :]).pow(2).sum(-1) # [N,M]
+
+    iou_lt = torch.max(box1[:, None, :2], box2[:, :2])  # [N,M,2]
+    iou_rb = torch.min(box1[:, None, 2:], box2[:, 2:])  # [N,M,2]
+    giou_lt = torch.min(box1[:, None, :2], box2[:, :2])  # [N,M,2]
+    giou_rb = torch.max(box1[:, None, 2:], box2[:, 2:])  # [N,M,2]
+    # calculate the enclose dimension distance
+    enclose_dis_sqr = (giou_lt[:, :, :] - giou_rb[:, :, :]).pow(2).sum(-1) # [M,N]
+
+
+
+    TO_REMOVE = 1
+
+    iou_wh = (iou_rb - iou_lt + TO_REMOVE).clamp(min=0)  # [N,M,2]
+    inter = iou_wh[:, :, 0] * iou_wh[:, :, 1]  # [N,M]
+    # giou_wh = (giou_rb - giou_lt + TO_REMOVE).clamp(min=0)  # [N,M,2]
+    # enclose = giou_wh[:, :, 0] * giou_wh[:, :, 1]  #[N,M]
+
+    union = area1[:, None] + area2 - inter
+    iou = inter / union
+    punish = euclid_dis_sqr / enclose_dis_sqr
+
+    diou = iou - punish
+    return diou
 
 # TODO redundant, remove
 def _cat(tensors, dim=0):
