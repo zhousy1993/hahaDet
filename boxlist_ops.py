@@ -177,7 +177,7 @@ def boxlist_diou(boxlist1, boxlist2):
     """
     if boxlist1.size != boxlist2.size:
         raise RuntimeError(
-                "boxlists should have same image size, got {}, {}".format(boxlist1, boxlist2))
+            "boxlists should have same image size, got {}, {}".format(boxlist1, boxlist2))
 
     N = len(boxlist1)
     M = len(boxlist2)
@@ -185,27 +185,26 @@ def boxlist_diou(boxlist1, boxlist2):
     area1 = boxlist1.area()
     area2 = boxlist2.area()
 
-    box1, box2 = boxlist1.bbox, boxlist2.bbox # [N,4] [M,4]
+    box1, box2 = boxlist1.bbox, boxlist2.bbox  # [N,4] [M,4]
 
     # cal the center of box1 and box2
-    box1_center_x = (box1[:, 0] + box1[:, 2]) / 2 # [N,1]
-    box1_center_y = (box1[:, 1] + box1[:, 3]) / 2 # [N,1]
-    box2_center_x = (box2[:, 0] + box2[:, 2]) / 2 # [M,1]
-    box2_center_y = (box2[:, 1] + box2[:, 3]) / 2 # [M,1]
-    box1_center = torch.cat((box1_center_x, box1_center_y), dim=1) # [N,2]
-    box2_center = torch.cat((box2_center_x, box2_center_y), dim=1) # [M,2]
+    box1_center_x = (box1[:, 0] + box1[:, 2]) / 2  # [N,1]
+    box1_center_y = (box1[:, 1] + box1[:, 3]) / 2  # [N,1]
+    box2_center_x = (box2[:, 0] + box2[:, 2]) / 2  # [M,1]
+    box2_center_y = (box2[:, 1] + box2[:, 3]) / 2  # [M,1]
+    box1_center = torch.stack([box1_center_x, box1_center_y], dim=1)  # [N,2]
+    box2_center = torch.stack([box2_center_x, box2_center_y], dim=1)  # [M,2]
 
-    #calculate the centerness distances
-    euclid_dis_sqr = (box1_center[:, None, :] - box2_center[:, :]).pow(2).sum(-1) # [N,M]
+    # calculate the centerness distances
+    euclid_dis_sqr = (box1_center[:, None, :] - box2_center[:, :]).pow(2).sum(-1)  # [N,M]
 
     iou_lt = torch.max(box1[:, None, :2], box2[:, :2])  # [N,M,2]
     iou_rb = torch.min(box1[:, None, 2:], box2[:, 2:])  # [N,M,2]
     giou_lt = torch.min(box1[:, None, :2], box2[:, :2])  # [N,M,2]
     giou_rb = torch.max(box1[:, None, 2:], box2[:, 2:])  # [N,M,2]
+
     # calculate the enclose dimension distance
-    enclose_dis_sqr = (giou_lt[:, :, :] - giou_rb[:, :, :]).pow(2).sum(-1) # [M,N]
-
-
+    enclose_dis_sqr = (giou_lt[:, :, :] - giou_rb[:, :, :]).pow(2).sum(-1)  # [M,N]
 
     TO_REMOVE = 1
 
