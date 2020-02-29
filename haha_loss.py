@@ -247,9 +247,16 @@ class ATSSLossComputation(object):
 
             elif self.cfg.MODEL.ATSS.POSITIVE_TYPE == 'DIoU':
                 dious = boxlist_diou(anchors_per_im, targets_per_im)
-                print('dious', dious[0, :])
-                ious = boxlist_iou(anchors_per_im, targets_per_im)
-                print('ious', ious[0, :])
+
+                # print('dious', dious[0:20, :])
+                # print('dious_non_zeros', torch.nonzero(dious).size())
+                # dious_nonzero_idxs = torch.nonzero(dious)
+                # candidate_dious_test = dious[dious_nonzero_idxs, torch.arange(num_gt)]
+                # print(candidate_dious_test.size())
+                # print(candidate_dious_test[1:20, :])
+                # ious = boxlist_iou(anchors_per_im, targets_per_im)
+                # print('ious', ious[0:20, :])
+                # print('ious_non_zeros', torch.nonzero(ious).size(0))
 
                 anchors_cx_per_im = (anchors_per_im.bbox[:, 2] + anchors_per_im.bbox[:, 0]) / 2.0
                 anchors_cy_per_im = (anchors_per_im.bbox[:, 3] + anchors_per_im.bbox[:, 1]) / 2.0
@@ -261,55 +268,27 @@ class ATSSLossComputation(object):
                 for level, anchors_per_level in enumerate(anchors[im_i]):
                     end_idx = star_idx + num_anchors_per_level[level]
                     dious_per_level = dious[star_idx:end_idx, :]
+                    # print('dious_per_level_size', dious_per_level.size())
                     topk = min(self.cfg.MODEL.ATSS.TOPK, num_anchors_per_level[level])
-                    _, topk_idxs_per_level = dious_per_level.topk(topk, dim=0, largest=False)
+                    # print('topk', topk)
+                    _, topk_idxs_per_level = dious_per_level.topk(topk, dim=0, largest=True)
+                    # print('topk_idxs_per_level', topk_idxs_per_level)
                     candidate_idxs.append(topk_idxs_per_level + star_idx)
                     star_idx = end_idx
                 candidate_idxs = torch.cat(candidate_idxs, dim=0)
-                # print('candidate_idx_size', candidate_idxs)
+                print('candidate_idx_size', candidate_idxs)
 
                 # Using the sum of mean and standard deviation as the DIoU threshold to select final positive samples
                 candidate_dious = dious[candidate_idxs, torch.arange(num_gt)]
-                # print('candidate_dious_size', candidate_dious)
+                print('candidate_dious', candidate_dious)
+                # candidate_ious = ious[candidate_idxs, torch.arange(num_gt)]
+                # print('candidate_ious', candidate_ious)
                 diou_mean_per_gt = candidate_dious.mean(0)
                 diou_std_per_gt = candidate_dious.std(0)
                 diou_thresh_per_gt = diou_mean_per_gt + diou_std_per_gt
                 is_pos = candidate_dious >= diou_thresh_per_gt[None, :]
 
-                # num_anchors_per_level = [len(anchors_per_level.bbox) for anchors_per_level in anchors[im_i]]
-                # ious = boxlist_iou(anchors_per_im, targets_per_im)
-                #
-                # gt_cx = (bboxes_per_im[:, 2] + bboxes_per_im[:, 0]) / 2.0
-                # gt_cy = (bboxes_per_im[:, 3] + bboxes_per_im[:, 1]) / 2.0
-                # gt_points = torch.stack((gt_cx, gt_cy), dim=1)
-                #
-                # anchors_cx_per_im = (anchors_per_im.bbox[:, 2] + anchors_per_im.bbox[:, 0]) / 2.0
-                # anchors_cy_per_im = (anchors_per_im.bbox[:, 3] + anchors_per_im.bbox[:, 1]) / 2.0
-                # anchor_points = torch.stack((anchors_cx_per_im, anchors_cy_per_im), dim=1)
-                #
-                # distances = (anchor_points[:, None, :] - gt_points[None, :, :]).pow(2).sum(-1).sqrt()
-                #
-                # # Selecting candidates based on the center distance between anchor box and object
-                # candidate_idxs = []
-                # star_idx = 0
-                # for level, anchors_per_level in enumerate(anchors[im_i]):
-                #     end_idx = star_idx + num_anchors_per_level[level]
-                #     distances_per_level = distances[star_idx:end_idx, :]
-                #     topk = min(self.cfg.MODEL.ATSS.TOPK, num_anchors_per_level[level])
-                #     _, topk_idxs_per_level = distances_per_level.topk(topk, dim=0, largest=False)
-                #     candidate_idxs.append(topk_idxs_per_level + star_idx)
-                #     star_idx = end_idx
-                # candidate_idxs = torch.cat(candidate_idxs, dim=0)
-                #
-                # # Using the sum of mean and standard deviation as the IoU threshold to select final positive samples
-                # candidate_ious = ious[candidate_idxs, torch.arange(num_gt)]
-                # iou_mean_per_gt = candidate_ious.mean(0)
-                # iou_std_per_gt = candidate_ious.std(0)
-                # iou_thresh_per_gt = iou_mean_per_gt + iou_std_per_gt
-                # is_pos = candidate_ious >= iou_thresh_per_gt[None, :]
-
                 # Limiting the final positive samples’ center to object
-
                 anchor_num = anchors_cx_per_im.shape[0]
                 for ng in range(num_gt):
                     candidate_idxs[:, ng] += ng * anchor_num
