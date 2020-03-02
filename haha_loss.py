@@ -76,6 +76,74 @@ class ATSSLossComputation(object):
             assert losses.numel() != 0
             return losses.sum()
 
+    def DIoULoss(self, pred, target, anchor, weight=None):
+
+        pred_boxes = self.box_coder.decode(pred.view(-1, 4), anchor.view(-1, 4))
+        pred_x1 = pred_boxes[:, 0]    # N * 1
+        pred_y1 = pred_boxes[:, 1]
+        pred_x2 = pred_boxes[:, 2]
+        pred_y2 = pred_boxes[:, 3]
+        pred_x2 = torch.max(pred_x1, pred_x2)
+        pred_y2 = torch.max(pred_y1, pred_y2)
+        pred_area = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
+        pred_center_x = (pred_x1 + pred_x2) / 2
+        pred_center_y = (pred_y1 + pred_y2) / 2
+        # print('1', pred_center_y)
+        # print('size', pred_center_y.size())
+        pred_center = torch.stack((pred_center_x, pred_center_y), dim=1)
+        # print('2', pred_center)
+        # print('size', pred_center.size())
+
+
+        gt_boxes = self.box_coder.decode(target.view(-1, 4), anchor.view(-1, 4))
+        target_x1 = gt_boxes[:, 0]
+        target_y1 = gt_boxes[:, 1]
+        target_x2 = gt_boxes[:, 2]
+        target_y2 = gt_boxes[:, 3]
+        target_area = (target_x2 - target_x1) * (target_y2 - target_y1)
+        target_center_x = (target_x1 + target_x2) / 2
+        target_center_y = (target_y1 + target_y2) / 2
+        target_center = torch.stack((target_center_x, target_center_y), dim=1)
+
+
+        x1_intersect = torch.max(pred_x1, target_x1)
+        y1_intersect = torch.max(pred_y1, target_y1)
+        x2_intersect = torch.min(pred_x2, target_x2)
+        y2_intersect = torch.min(pred_y2, target_y2)
+        area_intersect = torch.zeros(pred_x1.size()).to(pred)
+        mask = (y2_intersect > y1_intersect) * (x2_intersect > x1_intersect)
+        area_intersect[mask] = (x2_intersect[mask] - x1_intersect[mask]) * (y2_intersect[mask] - y1_intersect[mask])
+
+
+        x1_enclosing = torch.min(pred_x1, target_x1)
+        y1_enclosing = torch.min(pred_y1, target_y1)
+        x2_enclosing = torch.max(pred_x2, target_x2)
+        y2_enclosing = torch.max(pred_y2, target_y2)
+        # area_enclosing = (x2_enclosing - x1_enclosing) * (y2_enclosing - y1_enclosing) + 1e-7
+        enclosing_tl = torch.stack((x1_enclosing, y1_enclosing), dim=1)
+        enclosing_br = torch.stack((x2_enclosing, y2_enclosing), dim=1)
+
+        euclid_dis_sqr = (pred_center[:, :] - target_center[:, :]).pow(2).sum(-1)
+        enclose_dis_sqr = (enclosing_tl[:, :] - enclosing_br[:, :]).pow(2).sum(-1)
+        # print('1', enclose_dis_sqr.size())
+        punish = euclid_dis_sqr / enclose_dis_sqr
+        # print(punish.size())
+        # print('3', euclid_dis_sqr)
+        # print('size', euclid_dis_sqr.size())
+
+        area_union = pred_area + target_area - area_intersect + 1e-7
+        ious = area_intersect / area_union
+        # print('2', ious.size())
+        # gious = ious - (area_enclosing - area_union) / area_enclosing
+
+        losses = 1 - ious + punish
+
+        if weight is not None and weight.sum() > 0:
+            return (losses * weight).sum()
+        else:
+            assert losses.numel() != 0
+            return losses.sum()
+
     def prepare_targets(self, targets, anchors):
         cls_labels = []
         reg_targets = []
