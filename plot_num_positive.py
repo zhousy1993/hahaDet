@@ -48,9 +48,14 @@ def main():
     cls_labels, num_gt, count = file_preparation('retinanet_giou_record_proposal_gtbbox.txt,fcos_giou_record_proposal_gtbbox.txt,atss_iou_giou_record_proposal_gtbbox.txt')
     num_cls_labels_per_gt = []
     for i in range(len(cls_labels)):
-        num_cls_labels_per_gt.append(np.divide(cls_labels[i], num_gt[i]).tolist())
+        num_cls_labels_per_gt_per_method = np.divide(cls_labels[i], num_gt[i])
+        num_cls_labels_per_gt.append(num_cls_labels_per_gt_per_method.tolist())
+        mean_pos_per_gt = np.mean(num_cls_labels_per_gt, axis=1)
+        std_pos_per_gt = np.std(num_cls_labels_per_gt, axis=1)
     # print(num_cls_labels_per_gt[1])
     plot(count, num_cls_labels_per_gt[2])
+    print(mean_pos_per_gt)
+    print(std_pos_per_gt)
 
     # plot(x, y[1])
 
